@@ -51,7 +51,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
            <div className="bg-sage-200 p-1.5 rounded-lg">
               <GraduationCap className="w-5 h-5 text-slate-800" />
            </div>
-           <span className="font-serif font-bold text-lg">Mind Mentor</span>
+           <span className="font-serif font-bold text-lg">AI Mentor</span>
         </div>
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
           {isMobileMenuOpen ? <X /> : <Menu />}
@@ -70,7 +70,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <GraduationCap className="w-6 h-6 text-slate-800" />
             </div>
             <div>
-              <h1 className="font-serif font-bold text-xl leading-tight">Mind Mentor</h1>
+              <h1 className="font-serif font-bold text-xl leading-tight">AI Mentor</h1>
             </div>
           </div>
 

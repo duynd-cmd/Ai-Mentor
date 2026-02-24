@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { UserMemory, StudyPlan, Resource, Question } from '../types';
+import { retrieveRelevantChunks } from './localEmbeddingService';
 
 
 const getClient = () => {
@@ -39,7 +40,7 @@ const cleanAndParseJSON = (text: string) => {
 // --- Context Injection ---
 const constructSystemInstruction = (memory: UserMemory, contextType: string) => {
   return `
-    Bạn là Mind Mentor, một trợ lý học tập AI thông minh, điềm tĩnh và chuyên nghiệp.
+    Bạn là AI Mentor, một trợ lý học tập AI thông minh, điềm tĩnh và chuyên nghiệp.
     
     THÔNG TIN NGƯỜI DÙNG:
     Tên: ${memory.name}
@@ -51,6 +52,10 @@ const constructSystemInstruction = (memory: UserMemory, contextType: string) => 
     NGUYÊN TẮC:
     1. Ngôn ngữ: 100% Tiếng Việt.
     2. Nội dung: Chính xác, phù hợp giáo dục Việt Nam.
+    3. Khi có công thức toán, luôn viết đúng Markdown + LaTeX:
+       - Inline: $...$
+       - Xuống dòng riêng: $$...$$
+       - Không escape ký tự $.
   `;
 };
 
@@ -186,6 +191,15 @@ export const chatWithScriba = async (
   memory: UserMemory
 ): Promise<string> => {
   const ai = getClient();
+  const relevantChunks = retrieveRelevantChunks(message, documentContext, {
+    topK: 6,
+    maxChunkChars: 1100,
+    overlapChars: 180,
+  });
+  const groundedContext =
+    relevantChunks.length > 0
+      ? relevantChunks.join('\n\n---\n\n')
+      : documentContext.substring(0, 12000);
   
   const chat = ai.chats.create({
     model: 'gemini-3-flash-preview',
@@ -194,10 +208,11 @@ export const chatWithScriba = async (
       systemInstruction: `
         ${constructSystemInstruction(memory, 'Trợ lý Tài liệu Scriba')}
         
-        BỐI CẢNH TÀI LIỆU:
-        ${documentContext.substring(0, 20000)}
+        BỐI CẢNH TÀI LIỆU (đã truy hồi bằng local embedding chạy tại máy người dùng):
+        ${groundedContext}
         
-        Hãy trả lời câu hỏi dựa trên tài liệu được cung cấp. Giải thích dễ hiểu, phù hợp với học sinh ${memory.grade}.
+        Hãy trả lời dựa trên bối cảnh phía trên. Giải thích dễ hiểu, phù hợp với học sinh ${memory.grade}.
+        Nếu cần viết công thức, bắt buộc dùng LaTeX markdown để hiển thị đúng.
       `,
     }
   });
@@ -225,7 +240,7 @@ export const enhanceNote = async (content: string, action: 'summarize' | 'simpli
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Nội dung: "${content}"\n\nYêu cầu: ${prompt}`,
+      contents: `Nội dung: "${content}"\n\nYêu cầu: ${prompt}\n\nNếu có công thức toán thì dùng chuẩn markdown LaTeX: inline $...$, block $$...$$.`,
       config: {
         systemInstruction: constructSystemInstruction(memory, 'Gia sư Riêng'),
       }
